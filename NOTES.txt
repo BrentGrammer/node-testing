@@ -1,0 +1,229 @@
+TESTING NODE:
+
+Tools:
+  Mocha - Testing framework
+  Expect - assertion library owned by Jest - get the latest version 
+  Supertest - for testing route requests and responses
+  Rewire - for swapping variables out to use spies, essential library used for testing functions with sideeffects
+
+
+Install mocha:
+
+- $ npm i mocha --save-dev
+
+Install the Expect Assertion library (note this is now owned by Facebook in Jest)
+-Use this to pass in a value to expect() and make an assertion about it.
+
+Create a script in package.json that looks for any folder and any file name that ends with .test.js:
+"scripts": {
+    "test": "mocha **/*.test.js"
+  },
+
+Rerun test suite automatically on updates to any code in the app:
+(use escaped quotes since windows only recognizes double quotes)
+"scripts": {
+    "test": "mocha **/*.test.js",
+    "test-watch": "nodemon --exec \"npm test\""
+  },
+-Now you can use $ npm run test-watch to start the test suite
+
+EQUALITY MATCHING NOTE:
+
+*To test equality, for objects use .toEqual, for primitives use .toBe to 
+
+
+----------
+
+CREATING A TEST:
+
+-create a test file with the app file with a .test.js extension
+
+-Create a test case with it()
+Mocha is modeled on BDD (Behavior Driven Development):
+-the test description should describe what the function being tested should do
+
+-----------
+
+ASYNCHRONOUS TESTING:
+
+Note: if tests take longer than 2 seconds, Mocha will assume the test fails.
+
+**You need to pass in a done arg to the callback in the test.  Mocha will see this and know that this is an async test
+and it won't return and finish the test until done() is called.
+
+Ex:
+
+it('should async square a number', (done) => {
+  const res = utils.asyncSquare(3, (square) => {
+    expect(square).toBe(9).toBeA('number');
+    done();
+  });
+})
+
+---------------
+
+TESTING EXPRESS APPS:
+
+-Supertest: this can be used with Mocha as the base testing framework to test APIs and http requests
+
+install with npm:
+npm i supertest --save-dev
+
+
+-in the server file, export the express app:
+module.exports.app = app;
+
+-create a test file, i.e. server.test.js
+
+-import request from supertest and the express app:
+const request = require('supertest');
+const app = require('./server').app;
+const expect = require('expect');
+
+-To use supertest, pass the express app const into the request() method, and then chain methods to make the request and assertions:
+to make a request chain the verb and pass in the route - i.e. .get('/')
+to make assertions use .expect('<response expected>') and .expect(200) for status codes (expect will change it's check depending on what's passed in)
+to finish the test chain .end(done);
+
+*You can pass in a function to expect() which gets the response in the arg passed in for more flexibility:
+
+Ex:
+it('should return page not found 404', (done) => {
+  request(app)
+    .get('/')
+    .expect(404)
+    .expect(res => {
+      expect(res.body).toInclude({ error: 'Page not found.' });
+    })
+    .end(done);
+});
+
+-------
+
+USE DESCRIBE BLOCKS TO GROUP TESTS:
+
+describe('TypeOfTests', () => {
+  
+  ...tests
+
+})
+
+-You can nest describe blocks - syntax for description is '#Testnames':
+
+Ex:
+
+describe('Utils', () => {
+  describe('#add', () => {
+    it('should add two numbers', () => {
+      const res = utils.add(1, 2);
+      expect(res).toBe(3).toBeA('number');
+    });  
+  });
+...
+});
+
+Server Tests:
+
+describe('Server', () => {
+  describe('GET /', () => {
+    it('should return page not found 404', (done) => {
+      request(app)
+        .get('/')
+        .expect(404)
+        .expect(res => {
+          expect(res.body).toInclude({ error: 'Page not found.' });
+        })
+        .end(done);
+    });
+  });
+
+  describe('GET /users', () => {
+    it('should return my user object', (done) => {
+      request(app)
+        .get('/users')
+        .expect(200)
+        .expect(res => {
+          expect(res.body).toInclude({ 
+            name: 'My Name',
+            age: 26 
+          });
+        })
+        .end(done);
+    });
+  });
+});
+
+====================
+
+TEST SPIES:
+
+Spies: let you swap a real function in your app code for a testing utility.  You can then make assertions about the call 
+making sure that it was called with certain arguments.
+(Spies come built in with expect library)
+import them by importing the expect library.
+
+Creating a spy:
+
+1) Create the spy function which you will use in place of the real one and assign it to a const.
+
+-In old expect:  const spy = expect.createSpy();
+-In new Jest library:  
+var spy = jest.fn();
+spy();
+expect(spy).toHaveBeenCalled();
+
+2) call the spy and assert that it has been called and called with args:
+spy('arg1', 2);
+expect(spy).toHaveBeenCalled();
+expect(spy).toHaveBeenCalledWith('arg1', 2);
+
+---------
+
+REWIRE:
+
+install rewire npm package for swapping out variables to use with testing functions that have sideeffects.
+npm i rewire
+
+import it in test file: const rewire = require('rewire');
+
+*the way you use rewire, is you use it in place of require statements.
+
+
+
+// pass in the file you are testing into rewire instead of bringing it in via require:
+const app = rewire('./app');
+// this loads the file you are testing via require and also adds two methods to it:
+__get__
+__set__
+
+
+ -- These are used to mock out various data inside of app.js (the file you're testing)
+
+For example, you can use this to swap out an export module containing database calls and use a spy instead so that the
+database calls are not actually made.
+
+  // You can use a spy to simulate the database export used in app.js instead of the actual db object with database calls:
+  const db = {
+    saveUser: expect.createSpy()
+  }
+  // Now replace the db used in the app.js file with the spy created above:
+  // first arg is the variable in the original file you want to replace (as a string), and the second arg is what you are replacing it with (the spy):
+  app.__set__('db', db);
+
+**GOTCHA: In the original file being tested, any variables that are swapped with rewire need to be declared with let instead
+of const, because rewire needs to redefine them in tests.  Otherwise an error will be thrown.
+Ex in app.js (the file being tested and db is the variable being swapped with rewire)
+//You have to do a let here for rewire to be able to reassign this variable in tests
+let db = require('./db.js');
+
+
+
+
+
+
+
+
+
+
+
+
